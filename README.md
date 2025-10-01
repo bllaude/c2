@@ -1,4 +1,4 @@
-# Local-Only C2 System (Linux, C)
+# Local c2 (Linux, C)
 
 A minimal Command & Control system for Linux written in C, for red teaming and security research. 
 
