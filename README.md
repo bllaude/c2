@@ -1,18 +1,12 @@
-# Local C2
-A minimal Command & Control / remote-administration system for Linux written in
-portable C — built for **red teaming and security research only**. Run it only
-on machines you own or are explicitly authorised to administer.
+A minimal c2 / remote-administration system for Linux written in
+portable C.
 
-The tool is deliberately small: two single-binary programs (operator side and
+This tool is deliberately small: two single-binary programs (operator side and
 managed-host side) that share one documented wire protocol, with no
 dependencies beyond the C standard library and POSIX sockets.
 
-> ⚠️ **Legal & safety notice** — This software provides remote shell access.
-> Using it against systems without explicit written authorisation is illegal in
-> most jurisdictions. The authentication key travels in clear text; keep the
-> channel on a trusted network or tunnel it (VPN, `ssh -L`).
+Table of contents:
 
-## Table of contents
 - [Components](#components)
 - [Requirements](#requirements)
 - [Build](#build)
@@ -25,7 +19,7 @@ dependencies beyond the C standard library and POSIX sockets.
 - [Security considerations](#security-considerations)
 - [Exit codes](#exit-codes)
 
-## Components
+Components:
 
 | File | Role |
 |---|---|
@@ -35,12 +29,13 @@ dependencies beyond the C standard library and POSIX sockets.
 | `net.h` | Header-only (`static inline`) socket helpers: `send_all()` / `recv_all()` handling partial writes and `EINTR`. |
 | `tests/` | Unit tests (with a mocked libc `send()` via `-Wl,--wrap`) and an end-to-end test that drives the real binaries over TCP loopback, including a mock controller. |
 
-## Requirements
+Requirements:
+
 - Linux (POSIX sockets, `popen`, `getopt_long`)
 - A C compiler (`cc`/`gcc`/`clang`) and GNU `make`
 - `bash` for the end-to-end test script
 
-## Build
+Build:
 
 ```bash
 make            # builds bin/controller and bin/agent
@@ -50,8 +45,6 @@ make clean      # removes the bin/ directory
 
 Both programs link only against libc. The shared objects (`bin/protocol.o`) are
 compiled once from `protocol.c` and linked into each binary.
-
-## Quick start
 
 Testing mode:
 
@@ -82,9 +75,7 @@ One-shot command execution (agent connects, runs, disconnects):
 ./bin/controller --no-auth -c 'uname -a'
 ```
 
-## Usage
-
-### Controller
+Usage - Controller
 
 ```
 usage: controller [options]
@@ -104,7 +95,7 @@ usage: controller [options]
 Session verbs at the prompt: any line other than `exit` is sent verbatim to the
 agent's shell; an empty line is ignored (keepalive); `exit` ends the session.
 
-### Agent
+Usage - Agent
 
 ```
 usage: agent [options] [<controller-host>] [<port>]
@@ -119,7 +110,7 @@ usage: agent [options] [<controller-host>] [<port>]
 Defaults when no positional arguments are given: host `127.0.0.1`, port `4444`
 (both overridable at build time — see below).
 
-## Configuration
+Config:
 
 Every option has an environment-variable fallback (CLI options win):
 
@@ -139,7 +130,7 @@ make CFLAGS='-Wall -O2 -DDEFAULT_HOST="\"203.0.113.10\""'
 Tunable protocol constants (also `-D`-overridable): `BUF_SIZE` (4096),
 `PROTO_MAX_FRAME`, `LINE_MAX_LEN` (256), `MAX_KEY_LEN` (128).
 
-## Wire protocol (V1)
+Wire protocol (V1)
 
 Transport: TCP. All frames are ASCII. Full specification lives in the header
 comment of [`protocol.h`](protocol.h).
@@ -165,7 +156,7 @@ Limits: handshake lines are at most `LINE_MAX_LEN-1` bytes; response payloads
 are truncated to `PROTO_MAX_FRAME` bytes. Malformed or oversized frames cause
 the connection to be dropped (the stream cannot be resynchronised).
 
-## Testing
+Testing
 
 ```bash
 make test
@@ -182,7 +173,7 @@ runs three suites:
 Individual targets: `make test_send_all`, `make test_protocol`,
 `make mock_controller`. Set `E2E_PORT` to change the port used by the e2e test.
 
-## Project layout
+Project layout
 
 ```
 .
@@ -200,7 +191,8 @@ Individual targets: `make test_send_all`, `make test_protocol`,
     └── send_mock.c/.h      --wrap=send libc mock
 ```
 
-## Security considerations
+Security considerations:
+
 - **Clear-text secret.** The V1 handshake sends the shared key unencrypted. Use
   it only on trusted networks or inside a tunnel (VPN, `ssh -L <port>:...`).
 - **No-auth guardrails.** `--no-auth` refuses to bind beyond loopback unless
@@ -210,7 +202,8 @@ Individual targets: `make test_send_all`, `make test_protocol`,
 - **Input limits.** Fixed-size buffers and frame caps prevent trivial overflow
   issues, but the protocol offers no replay protection or forward secrecy.
 
-## Exit codes
+Exit codes:
+
 Both binaries follow the same convention:
 
 | Code | Meaning |
@@ -218,7 +211,3 @@ Both binaries follow the same convention:
 | 0 | normal end (session closed / command completed) |
 | 1 | runtime or network error |
 | 2 | bad usage (invalid options) |
-
-## License
-Provided for educational, research, and authorised red-team engagements only.
-No warranty of any kind.
