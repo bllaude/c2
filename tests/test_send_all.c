@@ -1,21 +1,20 @@
 /* tests/test_send_all.c
- * Unit tests for the send_all() helper that is duplicated in agent.c and controller.c.
+ * Unit tests for the shared framing helpers in net.h / protocol.c.
  *
- * send_all() is static in both sources, so each source is compiled as its own
- * translation unit (see Makefile `test` target) with:
- *   -Dmain=<file>_main          so the entry point does not clash
- *   -Dsend_all=<file>_send_all  so the test can call the internal helper
- *   -Wl,--wrap=send             so libc's send() is replaced by a mock (send_mock.c)
- *
- * The consistency of the two duplicated copies is checked separately by
- * tests/consistency_test.sh (textual comparison), since C forbids taking
- * addresses of functions across translation units reliably here.
- */
+ * send_all() lives in net.h as a static inline so both binaries get their own
+ * copy; to test it without touching a real socket we compile net.h into this
+ * translation unit with libc's send()/recv() replaced by mocks via
+ * -Wl,--wrap (see tests/send_mock.c and the Makefile `test` target). */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+
 #include "send_mock.h"
+
+/* Pull in the implementation under test. Wrapping makes calls to send() here
+ * resolve to __wrap_send() from tests/send_mock.c. */
+#include "../net.h"
 
 static int failures = 0;
 static int checks = 0;
@@ -31,10 +30,9 @@ static int checks = 0;
         }                                                                      \
     } while (0)
 
-/* --- Tests (run against BOTH copies of send_all) ------------------------- */
-static void run_suite(const char *name, send_all_fn send_all)
+static void run_send_suite(void)
 {
-    printf("== suite: %s ==\n", name);
+    printf("== suite: net.h::send_all ==\n");
 
     /* 1. zero-length payload must succeed without touching the socket */
     mock_reset();
@@ -93,8 +91,7 @@ static void run_suite(const char *name, send_all_fn send_all)
           mock_len(0) == 3 && mock_len(1) == 2 && mock_len(2) == 1,
           "[byte-at-a-time] advanced buffer offset (no resend/skip)");
 
-    /* 9. EINTR on a zero-length remainder must not spin forever: after all
-     *    bytes are sent, the loop exits with 0 regardless of further mocks. */
+    /* 9. exact write stops immediately */
     mock_reset();
     mock_queue(2, 0);
     CHECK(send_all(42, "ab", 2) == 0, "[exact write] returns 0 without extra calls");
@@ -103,8 +100,7 @@ static void run_suite(const char *name, send_all_fn send_all)
 
 int main(void)
 {
-    run_suite("agent.c::send_all", agent_send_all);
-    run_suite("controller.c::send_all", controller_send_all);
+    run_send_suite();
 
     printf("\n%s: %d checks, %d failures\n",
            failures ? "FAILED" : "PASSED", checks, failures);
